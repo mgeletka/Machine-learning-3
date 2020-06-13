@@ -45,11 +45,74 @@ gen_xml_data <- function(len=1000,...)
   sapply(1:len,function(i) gen_line(...)
          )
 
-data <- gen_xml_data(len=20, depth=2,maxtaglen=3,all_letters=0.3)
-data
+data <- gen_xml_data(len=1000, depth=2,maxtaglen=3,all_letters=0.3)
 ```
+###Create simple dataset
+```{r}
+minLengtOfSequences = 10
+data <- data[nchar(data) > minLengtOfSequences]
+sequences <- sapply(data, function(x) {substr(x, start = 1, stop = minLengtOfSequences - 1)})
+labels <- sapply(data, function(x) {substr(x, start = minLengtOfSequences - 1, stop = minLengtOfSequences - 1)})
+
+df <- df <- data.frame(Sequence=sequences, Label=labels) 
+summary(df)
+```
+
+###Preprocess input sequencies
+```{r}
+library(keras, quietly=TRUE)
+library(kerasR)
+
+text <- data
+max_features <- 28
+tokenizer <- text_tokenizer(num_words = max_features, char_level=TRUE)
+tokenizer %>% 
+  fit_text_tokenizer(text)
+
+text_seq <- texts_to_sequences(tokenizer, df$Sequence)
+x_train <- matrix(unlist(text_seq), ncol = minLengtOfSequences-1, byrow = TRUE)
+dim(x_train)
+
+y_train <- as.matrix(as.factor(unlist(texts_to_sequences(tokenizer, df$Label))))
+
+#y_seq <- as.integer(texts_to_sequences(tokenizer, df$Label))
+# y_seq <- y_seq - 1
+#y_train <- to_categorical(as.matrix(y_seq),  num_classes=max(y_seq))
+
+```
+
+
+
 ###MLP - TODO
 ```{r}
+
+embedding_dims <- 50
+
+
+model <- keras_model_sequential() %>% 
+  layer_dense(units = 64, activation = 'relu', input_shape = c(minLengtOfSequences-1)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = max_features, activation = 'softmax')
+
+
+model %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+hist <- model %>%
+  fit(
+    x_train,
+    y_train,
+    batch_size = 16,
+    epochs = 32,
+    validation_split = 0.2
+  )
+
+plot(hist)
 
 ```
 
