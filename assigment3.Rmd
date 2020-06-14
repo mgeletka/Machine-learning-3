@@ -1,5 +1,5 @@
 ---
-title: "Machine Learning, 2019/2020 - Assignment 2"
+title: "Machine Learning, 2019/2020 - Assignment 3"
 author: "Martin Geletka, Alessandra Crippa, Giulio Rago"
 date: "June 03, 2020"
 output: html_document
@@ -83,7 +83,7 @@ y_train <- as.matrix(as.factor(unlist(texts_to_sequences(tokenizer, df$Label))))
 
 
 
-###MLP - TODO
+###MLP
 ```{r}
 
 embedding_dims <- 50
@@ -108,21 +108,94 @@ hist <- model %>%
     x_train,
     y_train,
     batch_size = 16,
-    epochs = 32,
+    epochs = 100,
     validation_split = 0.2
   )
 
 plot(hist)
 
 ```
-
-###RNN - TODO
+###MLP-results
 ```{r}
-
+hist
 ```
 
-###LSTM -TODO
+###RNN 
 ```{r}
+modelRNN <- keras_model_sequential()
 
+x_train_RNN <- array(x_train,  dim = c(dim(x_train)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelRNN %>%
+    layer_simple_rnn(units = 64, input_shape = dim(x_train_RNN)[2:3])%>%
+    layer_flatten() %>% 
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelRNN %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histRNN <- modelRNN %>%
+  fit(
+    x_train_RNN,
+    y_train,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histRNN)
 ```
 
+###RNN -results
+```{r}
+histRNN
+```
+
+###LSTM
+
+```{r}
+modelLSTM <- keras_model_sequential()
+
+x_train_LSTM <- array(x_train,  dim = c(dim(x_train)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelLSTM %>%
+    layer_lstm(units = 64, activation = 'relu', input_shape = dim(x_train), return_sequences=TRUE)%>%
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelLSTM %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histLSTM <- model %>%
+  fit(
+    x_train,
+    y_train,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histLSTM)
+```
+
+###LSTM - results
+
+```{r}
+histLSTM
+```
+
+###Conslusion on basic data
+Both MLP and RNN learn and converge pretty quickly, but  LSTM is learning much slower and it seems it not converge so quickly then other two models.
+
+
+### Now try all model with more complicated data
+TODO
