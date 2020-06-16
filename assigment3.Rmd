@@ -1,5 +1,5 @@
 ---
-title: "Machine Learning, 2019/2020 - Assignment 2"
+title: "Machine Learning, 2019/2020 - Assignment 3"
 author: "Martin Geletka, Alessandra Crippa, Giulio Rago"
 date: "June 03, 2020"
 output: html_document
@@ -17,13 +17,18 @@ study some properties of a few ANN architectures. The studied architectures are
 In this assignment, we will compare the behaviour of these mehtods in terms of accuracy and convergence and show the best results for each network
 
 
+```{r}
+library(keras, quietly=TRUE)
+library(kerasR)
+```
+
+
 ## Generating pseudo XML data
 ```{r}
 gen_tag <- function(maxtaglen=5, all_letters=1) {
   taglen<-floor(runif(1)*maxtaglen+1)
   paste(letters[sample(1:(length(letters)*all_letters),taglen,replace=TRUE)], collapse='')
 }
-
 gen_line <- function(depth=5,maxtaglen,all_letters) {
   inner <- ""
   size <- runif(1)*7+3
@@ -43,23 +48,441 @@ gen_line <- function(depth=5,maxtaglen,all_letters) {
 # this function generates full sequences. You can truncate them using indexes.
 gen_xml_data <- function(len,depth,maxtaglen,all_letters)
   sapply(1:len,function(i) gen_line(depth,maxtaglen,all_letters))
-
-
-data <- gen_xml_data(len=20, depth=2,maxtaglen=3,all_letters=0.3)
-data
+data <- gen_xml_data(len=2000, depth=2,maxtaglen=3,all_letters=0.3)
 ```
-###MLP - TODO
+### Create simple dataset
+```{r}
+minLengtOfSequences = 10
+data <- data[nchar(data) > minLengtOfSequences]
+sequences <- sapply(data, function(x) {substr(x, start = 1, stop = minLengtOfSequences - 1)})
+labels <- sapply(data, function(x) {substr(x, start = minLengtOfSequences - 1, stop = minLengtOfSequences - 1)})
+
+df <- df <- data.frame(Sequence=sequences, Label=labels) 
+summary(df)
+```
+
+### Preprocess input sequencies
+```{r}
+text <- data
+max_features <- 28
+tokenizer <- text_tokenizer(num_words = max_features, char_level=TRUE)
+tokenizer %>% 
+  fit_text_tokenizer(text)
+
+text_seq <- texts_to_sequences(tokenizer, df$Sequence)
+x_train <- matrix(unlist(text_seq), ncol = minLengtOfSequences-1, byrow = TRUE)
+dim(x_train)
+
+y_train <- as.matrix(as.double(as.factor(unlist(texts_to_sequences(tokenizer, df$Label)))))
+
+#y_seq <- as.integer(texts_to_sequences(tokenizer, df$Label))
+# y_seq <- y_seq - 1
+#y_train <- to_categorical(as.matrix(y_seq),  num_classes=max(y_seq))
+
+```
+
+
+
+### MLP
 ```{r}
 
+embedding_dims <- 50
+
+
+model <- keras_model_sequential() %>% 
+  layer_dense(units = 64, activation = 'relu', input_shape = c(minLengtOfSequences-1)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = max_features, activation = 'softmax')
+
+
+model %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+hist_mlp <- model %>%
+  fit(
+    x_train,
+    y_train,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(hist)
+
+```
+### MLP-results
+```{r}
+hist_mlp
 ```
 
-###RNN - TODO
+### RNN 
+```{r}
+modelRNN <- keras_model_sequential()
+
+x_train_RNN <- array(x_train,  dim = c(dim(x_train)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelRNN %>%
+    layer_simple_rnn(units = 64, input_shape = dim(x_train_RNN)[2:3])%>%
+    layer_flatten() %>% 
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelRNN %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histRNN <- modelRNN %>%
+  fit(
+    x_train_RNN,
+    y_train,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histRNN)
+```
+
+### RNN -results
+```{r}
+histRNN
+```
+
+### LSTM
+
+```{r}
+modelLSTM <- keras_model_sequential()
+
+x_train_LSTM <- array(x_train,  dim = c(dim(x_train)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelLSTM %>%
+    layer_lstm(units = 64, activation = 'relu', input_shape = dim(x_train), return_sequences=TRUE)%>%
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelLSTM %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histLSTM <- model %>%
+  fit(
+    x_train,
+    y_train,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histLSTM)
+```
+
+### LSTM - results
+
+```{r}
+histLSTM
+```
+
+### Conslusion on basic data
+Both MLP and RNN learn and converge pretty quickly, but  LSTM is learning much slower and it seems it not converge so quickly then other two models.
+the Rnn is the model that learn more quickly, indeed it reaches an accuracy of 0.99 in more or less fifty epochs.
+
+
+### Now try all model with more complicated data
+In this model we increase the len of the sequence to 20000 instead of 
 ```{r}
 
+big_data <- gen_xml_data(len=20000, depth=10,maxtaglen=15,all_letters=0.4)
+
 ```
 
-###LSTM -TODO
+
+
+
+```{r}
+minLengtOfSequences = 10
+big_data <- big_data[nchar(big_data) > minLengtOfSequences]
+sequences <- sapply(big_data, function(x) {substr(x, start = 1, stop = minLengtOfSequences - 1)})
+labels <- sapply(big_data, function(x) {substr(x, start = minLengtOfSequences - 1, stop = minLengtOfSequences - 1)})
+
+df <- df <- data.frame(Sequence=sequences, Label=labels) 
+summary(df)
+```
+
+```{r}
+text <- big_data
+max_features <- 28
+tokenizer <- text_tokenizer(num_words = max_features, char_level=TRUE)
+tokenizer %>% 
+  fit_text_tokenizer(text)
+
+text_seq <- texts_to_sequences(tokenizer, df$Sequence)
+x_train_big <- matrix(unlist(text_seq), ncol = minLengtOfSequences-1, byrow = TRUE)
+dim(x_train)
+
+y_train_big <- as.matrix(as.double(as.factor(unlist(texts_to_sequences(tokenizer, df$Label)))))
+```
+
+### MLP
 ```{r}
 
+embedding_dims <- 50
+
+
+model <- keras_model_sequential() %>% 
+  layer_dense(units = 64, activation = 'relu', input_shape = c(minLengtOfSequences-1)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = max_features, activation = 'softmax')
+
+
+model %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+hist_mlp_big <- model %>%
+  fit(
+    x_train_big,
+    y_train_big,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(hist_mlp_big)
+
+```
+```{r}
+hist_mlp_big
 ```
 
+
+### RNN - Big
+```{r}
+modelRNN <- keras_model_sequential()
+
+x_train_RNN <- array(x_train_big,  dim = c(dim(x_train_big)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelRNN %>%
+    layer_simple_rnn(units = 64, input_shape = dim(x_train_RNN)[2:3])%>%
+    layer_flatten() %>% 
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelRNN %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histRNN_big <- modelRNN %>%
+  fit(
+    x_train_RNN,
+    y_train_big,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histRNN_big)
+```
+
+```{r}
+histRNN_big
+
+```
+### LSTM big
+```{r}
+modelLSTM <- keras_model_sequential()
+
+x_train_LSTM <- array(x_train_big,  dim = c(dim(x_train)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelLSTM %>%
+    layer_lstm(units = 64, activation = 'relu', input_shape = dim(x_train_big), return_sequences=TRUE)%>%
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelLSTM %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histLSTM_big <- model %>%
+  fit(
+    x_train_big,
+    y_train_big,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histLSTM_big)
+```
+
+
+```{r}
+histLSTM_big
+
+```
+
+
+```{r}
+
+d_data <- gen_xml_data(len=20000, depth=15,maxtaglen=15,all_letters=0.5)
+
+```
+
+
+```{r}
+minLengtOfSequences = 10
+d_data <- d_data[nchar(d_data) > minLengtOfSequences]
+sequences <- sapply(d_data, function(x) {substr(x, start = 1, stop = minLengtOfSequences - 1)})
+labels <- sapply(d_data, function(x) {substr(x, start = minLengtOfSequences - 1, stop = minLengtOfSequences - 1)})
+
+df <- df <- data.frame(Sequence=sequences, Label=labels) 
+summary(df)
+```
+
+
+```{r}
+text <- d_data
+max_features <- 28
+tokenizer <- text_tokenizer(num_words = max_features, char_level=TRUE)
+tokenizer %>% 
+  fit_text_tokenizer(text)
+
+text_seq <- texts_to_sequences(tokenizer, df$Sequence)
+x_train_d <- matrix(unlist(text_seq), ncol = minLengtOfSequences-1, byrow = TRUE)
+dim(x_train)
+
+y_train_d <- as.matrix(as.double(as.factor(unlist(texts_to_sequences(tokenizer, df$Label)))))
+```
+
+### MLP
+```{r}
+
+embedding_dims <- 50
+
+
+model <- keras_model_sequential() %>% 
+  layer_dense(units = 64, activation = 'relu', input_shape = c(minLengtOfSequences-1)) %>% 
+  layer_dropout(rate = 0.4) %>% 
+  layer_dense(units = 128, activation = 'relu') %>%
+  layer_dropout(rate = 0.3) %>%
+  layer_dense(units = max_features, activation = 'softmax')
+
+
+model %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+hist_mlp_d <- model %>%
+  fit(
+    x_train_d,
+    y_train_d,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(hist_mlp_d)
+
+```
+
+
+```{r}
+hist_mlp_d
+```
+
+
+
+### RNN d
+```{r}
+modelRNN <- keras_model_sequential()
+
+x_train_RNN <- array(x_train_d,  dim = c(dim(x_train_d)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelRNN %>%
+    layer_simple_rnn(units = 64, input_shape = dim(x_train_RNN)[2:3])%>%
+    layer_flatten() %>% 
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelRNN %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histRNN_d <- modelRNN %>%
+  fit(
+    x_train_RNN,
+    y_train_d,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histRNN_d)
+```
+
+
+```{r}
+histRNN_d
+```
+
+
+#### LMST
+
+```{r}
+modelLSTM <- keras_model_sequential()
+
+x_train_LSTM <- array(x_train_d,  dim = c(dim(x_train_d)[1], minLengtOfSequences-1, 1))
+
+# Topology
+modelLSTM %>%
+    layer_lstm(units = 64, activation = 'relu', input_shape = dim(x_train_big), return_sequences=TRUE)%>%
+    layer_dense(units = max_features, activation = 'softmax')
+
+# loss, optimizer, metrics
+modelLSTM %>% compile(
+  loss = 'sparse_categorical_crossentropy',
+  optimizer = optimizer_rmsprop(),
+  metrics = c('accuracy')
+)
+
+histLSTM_d <- model %>%
+  fit(
+    x_train_LSTM,
+    y_train_d,
+    batch_size = 16,
+    epochs = 100,
+    validation_split = 0.2
+  )
+
+plot(histLSTM_d)
+```
+
+
+```{r}
+histLSTM_d
+```
