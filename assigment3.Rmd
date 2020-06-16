@@ -111,8 +111,10 @@ hist_mlp <- model %>%
     epochs = 100,
     validation_split = 0.2
   )
+```
 
-plot(hist)
+```{r}
+plot(hist_mlp)
 
 ```
 ### MLP-results
@@ -196,13 +198,15 @@ histLSTM
 ### Conslusion on basic data
 Both MLP and RNN learn and converge pretty quickly, but  LSTM is learning much slower and it seems it not converge so quickly then other two models.
 the Rnn is the model that learn more quickly, indeed it reaches an accuracy of 0.99 in more or less fifty epochs.
+Also, the mls converge very quickly but it does not reach a satisfactory accuracy.
+the lstm's accuracy grows in a similar to the linear way, so we can think that increasing the number of epochs we can reach a more satisfice accuracy and loss 
 
 
 ### Now try all model with more complicated data
 In this model we increase the len of the sequence to 20000 instead of 
 ```{r}
 
-big_data <- gen_xml_data(len=20000, depth=10,maxtaglen=15,all_letters=0.4)
+big_data <- gen_xml_data(len=20000, depth=10,maxtaglen=15,all_letters=0.3)
 
 ```
 
@@ -341,10 +345,14 @@ histLSTM_big
 
 ```
 
+With the increase of the dataset, our result change:
+the Mls model is the one that remains more similar to the previous one, we can see how it converge,
+the other two models assume a very strange because they converge super quickly to the best value possible.
+
 
 ```{r}
 
-d_data <- gen_xml_data(len=20000, depth=15,maxtaglen=15,all_letters=0.5)
+d_data <- gen_xml_data(len=20000, depth=15,maxtaglen=15,all_letters=0.4)
 
 ```
 
@@ -450,17 +458,16 @@ plot(histRNN_d)
 histRNN_d
 ```
 
-
 #### LMST
 
 ```{r}
 modelLSTM <- keras_model_sequential()
 
-x_train_LSTM <- array(x_train_d,  dim = c(dim(x_train_d)[1], minLengtOfSequences-1, 1))
+x_train_LSTM <- array(x_train_d,  dim = c(dim(x_train)[1], minLengtOfSequences-1, 1))
 
 # Topology
 modelLSTM %>%
-    layer_lstm(units = 64, activation = 'relu', input_shape = dim(x_train_big), return_sequences=TRUE)%>%
+    layer_lstm(units = 64, activation = 'relu', input_shape = dim(x_train_d), return_sequences=TRUE)%>%
     layer_dense(units = max_features, activation = 'softmax')
 
 # loss, optimizer, metrics
@@ -472,7 +479,7 @@ modelLSTM %>% compile(
 
 histLSTM_d <- model %>%
   fit(
-    x_train_LSTM,
+    x_train_d,
     y_train_d,
     batch_size = 16,
     epochs = 100,
@@ -486,3 +493,7 @@ plot(histLSTM_d)
 ```{r}
 histLSTM_d
 ```
+
+the MLS  preserve its performance: it converges pretty fast and reaches a good level of accuracy.
+The RNN keeps the trend of the last dataset: the convergence is obtained in a few numbers of epochs.
+The LSTM change again its performance, in this case, the model converges but in a very slow way.
